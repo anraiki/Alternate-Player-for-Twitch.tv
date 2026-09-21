@@ -1,0 +1,126 @@
+{
+  "manifest_version": 3,
+  "name": "Alternate Player for Twitch.tv",
+  "short_name": "Alternate Player",
+  "version": "2026.6.21",
+  "description": "__MSG_M0001__",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "author": "Alexander Choporov (CoolCmd)",
+  "default_locale": "en",
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"
+  },
+  "permissions": [
+    "storage",
+    "cookies",
+    "declarativeNetRequest",
+    "declarativeNetRequestWithHostAccess",
+    "clipboardWrite"
+  ],
+  "host_permissions": [
+    "*://*.twitch.tv/*",
+    "*://*.twitchcdn.net/*",
+    "*://*.ttvnw.net/*",
+    "*://*.jtvnw.net/*",
+    "*://*.live-video.net/*",
+    "*://*.akamaized.net/*",
+    "*://*.cloudfront.net/*"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [ "content.css" ],
+      "matches": [ "https://www.twitch.tv/*", "https://m.twitch.tv/*" ]
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "chat_frame_headers",
+        "enabled": true,
+        "path": "rules.json"
+      }
+    ]
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.twitch.tv/*"
+      ],
+      "exclude_matches": [
+        "https://www.twitch.tv/popout/"
+      ],
+      "js": [
+        "autoclaim.js"
+      ],
+      "all_frames": true,
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.twitch.tv/*"
+      ],
+      "js": [
+        "gqltoken.js"
+      ],
+      "all_frames": true,
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://www.twitch.tv/*",
+        "https://m.twitch.tv/*"
+      ],
+      "exclude_matches": [
+        "https://www.twitch.tv/popout/"
+      ],
+      "js": [
+        "common.js",
+        "content.js"
+      ],
+      "all_frames": true,
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://www.twitch.tv/popout/*/chat",
+        "https://www.twitch.tv/embed/*/chat",
+        "https://m.twitch.tv/popout/*/chat",
+        "https://m.twitch.tv/embed/*/chat"
+      ],
+      "js": [
+        "mainworld-chat.js"
+      ],
+      "all_frames": true,
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://www.twitch.tv/*",
+        "https://m.twitch.tv/*"
+      ],
+      "exclude_matches": [
+        "https://www.twitch.tv/popout/",
+        "https://www.twitch.tv/popout/*/chat",
+        "https://www.twitch.tv/embed/*/chat",
+        "https://m.twitch.tv/popout/*/chat",
+        "https://m.twitch.tv/embed/*/chat"
+      ],
+      "js": [
+        "mainworld-functions.js"
+      ],
+      "all_frames": true,
+      "run_at": "document_start",
+      "world": "MAIN"
+    }
+  ]
+}
