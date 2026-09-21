@@ -405,6 +405,7 @@ function изменитьСтильЧата() {
 }
 
 function изменитьПоведениеЧата() {
+	добавитьОткрытиеЧатаВОкне();
 	window.addEventListener('click', оСобытие => {
 		if (!document.hasFocus()) {
 			const {activeElement} = document;
@@ -425,10 +426,57 @@ function изменитьПоведениеЧата() {
 		if (!узСсылка) {
 			return;
 		}
+		if (узСсылка.classList.contains('tw5-chat-popout')) {
+			оСобытие.preventDefault();
+			оСобытие.stopImmediatePropagation();
+			window.open(узСсылка.href, '_blank', 'popup,width=420,height=720,noopener');
+			return;
+		}
 		м_Журнал.Окак(`[content.js] Открываю ссылку в новой вкладке: ${узСсылка.getAttribute('href')}`);
 		узСсылка.target = '_blank';
 		оСобытие.stopImmediatePropagation();
 	}, true);
+}
+
+function добавитьОткрытиеЧатаВОкне() {
+	const menuSelector = '[data-a-target="chat-settings-balloon"], .chat-settings__popover';
+	function addLink(menu) {
+		// Twitch may wrap one matching container in another.
+		if (menu.parentElement?.closest(menuSelector) || menu.querySelector('.tw5-chat-popout')) {
+			return;
+		}
+		const channel = разобратьАдрес(location).сКодКанала;
+		if (!channel) {
+			return;
+		}
+		const link = document.createElement('a');
+		link.className = 'tw5-chat-popout';
+		link.textContent = 'Chat Popout';
+		link.href = `https://www.twitch.tv/popout/${encodeURIComponent(channel)}/chat?popout=`;
+		link.target = '_blank';
+		link.rel = 'noopener';
+		menu.appendChild(link);
+	}
+	function scan(root) {
+		if (root.nodeType !== Node.ELEMENT_NODE) {
+			return;
+		}
+		if (root.matches(menuSelector)) {
+			addLink(root);
+		}
+		root.querySelectorAll(menuSelector).forEach(addLink);
+	}
+	// Settings are mounted lazily and recreated whenever the menu opens.
+	new MutationObserver(records => {
+		for (const record of records) {
+			for (const node of record.addedNodes) {
+				scan(node);
+			}
+		}
+	}).observe(document, {childList: true, subtree: true});
+	if (document.documentElement) {
+		scan(document.documentElement);
+	}
 }
 
 function удалитьХвостыСтаройВерсии() {
