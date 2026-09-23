@@ -27,8 +27,12 @@ The default interface language is English. Much of the inherited source code use
 The extension loads directly from this folder without a build step. To run the playback regression tests with Node.js:
 
 ```sh
-node --test tests/playback.test.cjs
+node --test tests/*.test.cjs
 ```
+
+The player supports unencrypted H.264/AAC fragmented MP4 playlists with a separate `EXT-X-MAP` initialization file, as well as the existing MPEG-TS path. Initialization byte ranges and encrypted streams remain unsupported.
+
+For a browser playback smoke test, run `python -m http.server 8000 --bind 127.0.0.1` from the repository, then open `http://127.0.0.1:8000/tests/fmp4-browser.html`. The test sends synthetic media through the actual worker and MediaSource playback path and reports `PASS` after playback ends.
 
 Instructions for rebuilding the bundled WebAssembly file are in [sources/README](sources/README).
 

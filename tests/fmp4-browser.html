@@ -1,0 +1,47 @@
+<!doctype html><meta charset="utf-8"><video muted controls></video><pre id="result">RUNNING</pre><script>
+(async () => {
+ const result = document.querySelector('#result');
+ try {
+  const video = document.querySelector('video');
+  const worker = new Worker('../worker.js');
+  const source = new MediaSource();
+  video.src = URL.createObjectURL(source);
+  const opened = new Promise(resolve => source.addEventListener('sourceopen', resolve, {once:true}));
+  const init = await fetch('fixtures/fmp4/init.mp4').then(r=>r.arrayBuffer());
+  let buffer;
+  const converted = [];
+  worker.onerror = event => {result.textContent = 'FAIL worker: ' + event.message;};
+  const receive = () => new Promise((resolve, reject) => {
+   worker.onmessage = ({data}) => {
+    if(data[0] === 1) resolve(data[1]);
+    else if(data[0] === 3 || data[0] === 4) reject(new Error(JSON.stringify(data)));
+   };
+  });
+  await opened;
+  for(let i=0;i<2;i++) {
+   const media = await fetch('fixtures/fmp4/segment'+i+'.m4s').then(r=>r.arrayBuffer());
+   const pending = receive();
+   worker.postMessage({чНомер:i,чДлительность:1,лРазрыв:i===0,пДанные:media,fmp4:{url:'init.mp4',initialization:init,codecs:'avc1.4d401f,mp4a.40.2'}},[media]);
+   const segment = await pending;
+   const data = segment.пДанные;
+   converted.push(segment.чНомер);
+   if(!buffer) buffer = source.addSourceBuffer(data.сКодеки);
+   for(const bytes of [data.мбСегментИнициализации,data.мбМедиасегмент].filter(Boolean)) {
+    await new Promise((resolve,reject)=>{
+     buffer.addEventListener('updateend',resolve,{once:true});
+     buffer.addEventListener('error',reject,{once:true});
+     buffer.appendBuffer(bytes);
+    });
+   }
+  }
+  source.endOfStream();
+  await video.play();
+  await new Promise((resolve,reject)=>{
+   video.addEventListener('ended',resolve,{once:true});
+   video.addEventListener('error',()=>reject(new Error('video error '+video.error.code)),{once:true});
+  });
+  result.textContent = JSON.stringify({status:'PASS',segments:converted,width:video.videoWidth,height:video.videoHeight,time:video.currentTime,frames:video.getVideoPlaybackQuality().totalVideoFrames});
+  worker.terminate();
+ } catch(error) {result.textContent='FAIL '+error.stack;}
+})();
+</script>

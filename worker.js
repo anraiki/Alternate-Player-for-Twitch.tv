@@ -1,5 +1,90 @@
 'use strict';
 
+// Read only MP4 metadata needed by the existing MSE playback path. Media bytes
+// remain untouched; the browser handles sample timing and codec configuration.
+function prepareFragmentedMP4(initialization, media, declaredCodecs) {
+	function boxes(buffer, start = 0, end = buffer.byteLength) {
+		const view = new DataView(buffer), result = [];
+		while (start < end) {
+			if (end - start < 8) throw new Error('Truncated MP4 box');
+			let size = view.getUint32(start), header = 8;
+			const type = String.fromCharCode(...new Uint8Array(buffer, start + 4, 4));
+			if (size === 1) {
+				if (end - start < 16) throw new Error('Truncated MP4 extended size');
+				size = view.getUint32(start + 8) * 4294967296 + view.getUint32(start + 12);
+				header = 16;
+			} else if (size === 0) size = end - start;
+			if (!Number.isSafeInteger(size) || size < header || size > end - start) throw new Error('Invalid MP4 box size');
+			result.push({type, start: start + header, end: start + size});
+			start += size;
+		}
+		return result;
+	}
+	function child(buffer, parent, type) {
+		const box = boxes(buffer, parent.start, parent.end).find(box => box.type === type);
+		if (!box) throw new Error(`Missing MP4 ${type} box`);
+		return box;
+	}
+	function uint(buffer, box, offset) {
+		if (box.start + offset + 4 > box.end) throw new Error(`Truncated MP4 ${box.type} box`);
+		return new DataView(buffer).getUint32(box.start + offset);
+	}
+	const root = {start: 0, end: initialization.byteLength};
+	const moov = child(initialization, root, 'moov');
+	const tracks = new Map(), codecs = [];
+	const data = {fmp4: true, лЕстьВидео: false, лЕстьЗвук: false, чПреобразованЗа: 0};
+	for (const trak of boxes(initialization, moov.start, moov.end).filter(box => box.type === 'trak')) {
+		const tkhd = child(initialization, trak, 'tkhd');
+		const id = uint(initialization, tkhd, (uint(initialization, tkhd, 0) >>> 24) === 1 ? 20 : 12);
+		const mdia = child(initialization, trak, 'mdia');
+		const mdhd = child(initialization, mdia, 'mdhd');
+		const timescale = uint(initialization, mdhd, (uint(initialization, mdhd, 0) >>> 24) === 1 ? 20 : 12);
+		if (!timescale) throw new Error('Invalid MP4 timescale');
+		const stbl = child(initialization, child(initialization, mdia, 'minf'), 'stbl');
+		const stsd = child(initialization, stbl, 'stsd');
+		if (uint(initialization, stsd, 4) !== 1) throw new Error('Unsupported MP4 sample descriptions');
+		const entries = boxes(initialization, stsd.start + 8, stsd.end);
+		if (entries.length !== 1) throw new Error('Invalid MP4 sample description');
+		const entry = entries[0];
+		if (entry.type === 'encv' || entry.type === 'enca') throw new Error('Encrypted MP4');
+		if (entry.type === 'avc1' || entry.type === 'avc3') {
+			const avcC = child(initialization, {start: entry.start + 78, end: entry.end}, 'avcC');
+			const config = uint(initialization, avcC, 0);
+			codecs.push(`${entry.type}.${(config & 0xffffff).toString(16).padStart(6, '0')}`);
+			data.лЕстьВидео = true;
+			const dimensions = uint(initialization, entry, 24);
+			data.чШиринаКартинки = dimensions >>> 16;
+			data.чВысотаКартинки = dimensions & 65535;
+		} else if (entry.type === 'mp4a') {
+			const codec = (declaredCodecs || '').split(',').map(value => value.trim()).find(value => /^mp4a\.40\.\d+$/.test(value));
+			if (!codec) throw new Error('Missing MP4 audio codec');
+			codecs.push(codec);
+			data.лЕстьЗвук = true;
+		} else throw new Error(`Unsupported MP4 sample entry: ${entry.type}`);
+		tracks.set(id, timescale);
+	}
+	if (!tracks.size) throw new Error('MP4 has no tracks');
+	const fragments = boxes(media);
+	if (!fragments.some(box => box.type === 'mdat')) throw new Error('MP4 has no media data');
+	let position = Infinity;
+	for (const moof of fragments.filter(box => box.type === 'moof')) {
+		for (const traf of boxes(media, moof.start, moof.end).filter(box => box.type === 'traf')) {
+			const tfhd = child(media, traf, 'tfhd'), tfdt = child(media, traf, 'tfdt');
+			const timescale = tracks.get(uint(media, tfhd, 4));
+			const version = uint(media, tfdt, 0) >>> 24;
+			if (!timescale || version > 1) throw new Error('Invalid MP4 fragment timing');
+			const timestamp = version === 1 ? uint(media, tfdt, 4) * 4294967296 + uint(media, tfdt, 8) : uint(media, tfdt, 4);
+			if (!Number.isSafeInteger(timestamp)) throw new Error('Invalid MP4 decode time');
+			position = Math.min(position, timestamp / timescale);
+		}
+	}
+	if (!Number.isFinite(position)) throw new Error('MP4 has no timed fragments');
+	data.чПозицияКодирования = position;
+	data.сКодеки = `${data.лЕстьВидео ? 'video' : 'audio'}/mp4;codecs="${codecs.join(',')}"`;
+	data.мбМедиасегмент = new Uint8Array(media);
+	return data;
+}
+
 var ДЕЛАТЬ_ПЕРВЫЙ_КАДР_КЛЮЧЕВЫМ = false;
 
 var СОСТОЯНИЕ_СМЕНА_ВАРИАНТА = 9;
@@ -1699,11 +1784,40 @@ var м_Журнал = (() => {
 		ОтправитьРезультат();
 		_лРазрыв = true;
 	}
+	let lastMP4Initialization = null;
+	function processFragmentedMP4() {
+		const segment = _оИсходныйСегмент, info = segment.fmp4;
+		let data;
+		try {
+			data = prepareFragmentedMP4(info.initialization, segment.пДанные, info.codecs);
+		} catch (error) {
+			if (error.message === 'Encrypted MP4') ЗавершитьРаботуИПоказатьСообщение('J0219');
+			throw error;
+		}
+		data.чПозицияТрансляции = info.streamPosition;
+		data.чВремяКодирования = info.programTime;
+		segment.лРазрыв = segment.лРазрыв || lastMP4Initialization !== info.url;
+		const transfers = [data.мбМедиасегмент.buffer];
+		if (segment.лРазрыв) {
+			data.мбСегментИнициализации = new Uint8Array(info.initialization);
+			transfers.push(info.initialization);
+		}
+		lastMP4Initialization = info.url;
+		// A later transport-stream segment must start a fresh converter timeline.
+		_лРазрыв = true;
+		delete segment.fmp4;
+		segment.пДанные = data;
+		ОтправитьРезультат(transfers);
+	}
 	function ОбработатьСообщение(пДанные) {
 		_оИсходныйСегмент = пДанные;
 		if (typeof _оИсходныйСегмент.пДанные == 'number') {
+			lastMP4Initialization = null;
 			ОбработатьСменуСостояния();
+		} else if (_оИсходныйСегмент.fmp4) {
+			processFragmentedMP4();
 		} else {
+			lastMP4Initialization = null;
 			ПреобразоватьСегмент();
 		}
 		_оИсходныйСегмент = null;
