@@ -533,6 +533,22 @@ function показыватьУдаленныеСообщения() {
 	}
 }
 
+async function загрузитьДополненияЧата() {
+	const [моДополнения] = await Promise.all([ получитьУстановленныеДополненияЧата(), м_Настройки.Восстановить() ]);
+	// 7TV appends its root to document.body as soon as it runs.
+	if (document.readyState === 'loading') {
+		await new Promise(фВыполнить => document.addEventListener('DOMContentLoaded', фВыполнить, {once: true}));
+	}
+	const мсНазвания = моДополнения.filter(оДополнение => м_Настройки.Получить(оДополнение.сНастройка)).map(оДополнение => оДополнение.сНазвание);
+	if (мсНазвания.length !== 0) {
+		м_Журнал.Окак(`[content.js] Загружаю в чат ${мсНазвания}`);
+		// Scripts inserted from the isolated world fall under the extension's CSP, so mainworld-chat.js inserts them.
+		window.dispatchEvent(new CustomEvent('tw5-загрузитьдополнения', {
+			detail: JSON.stringify(мсНазвания)
+		}));
+	}
+}
+
 function удалитьХвостыСтаройВерсии() {
 	const сузУдалить = document.getElementsByClassName('tw5-js-удалить');
 	while (сузУдалить.length !== 0) {
@@ -548,6 +564,9 @@ function удалитьХвостыСтаройВерсии() {
 		if (window.top !== window) {
 			изменитьСтильЧата();
 			изменитьПоведениеЧата();
+			if (location.ancestorOrigins?.[0] === new URL(chrome.runtime.getURL('')).origin) {
+				загрузитьДополненияЧата().catch(м_Отладка.ПойманоИсключение);
+			}
 		}
 		return;
 	}

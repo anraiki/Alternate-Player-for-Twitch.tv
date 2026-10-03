@@ -43,4 +43,10 @@ chrome.runtime.onMessage.addListener((оСообщение, оОтправите
 			url: `${chrome.runtime.getURL('player.html')}${оСообщение.сАдрес}`
 		});
 	}
+	if (оСообщение.сЗапрос === 'ПолучитьВключенныеРасширения') {
+		chrome.management.getAll().then(моРасширения => {
+			фОтветить(моРасширения.filter(оРасширение => оРасширение.enabled).map(({id, name}) => ({id, name})));
+		}, () => фОтветить([]));
+		return true;
+	}
 });

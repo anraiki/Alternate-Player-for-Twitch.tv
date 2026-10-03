@@ -162,6 +162,33 @@ function ПолучитьАдресНашегоПроигрывателя(сКо
 	return chrome.runtime.getURL('player.html') + сПараметры;
 }
 
+// The browser does not run other extensions inside our page, so the chat in our player
+// loads the web builds of these emote extensions itself.
+const ДОПОЛНЕНИЯ_ЧАТА = [ {
+	сНастройка: 'лДополнениеЧатаFFZ',
+	сНазвание: 'FrankerFaceZ',
+	сИд: 'fadndhdgpmmaapbmfcknlfgcflmmmieb',
+	рвИмя: /^FrankerFaceZ\b/i
+}, {
+	сНастройка: 'лДополнениеЧатаBTTV',
+	сНазвание: 'BetterTTV',
+	сИд: 'ajopnjidmegmdimjlfnijceegpefgped',
+	рвИмя: /^BetterTTV\b/i
+}, {
+	сНастройка: 'лДополнениеЧата7TV',
+	сНазвание: '7TV',
+	сИд: 'ammjkodgmmoknidbanneddgankgfejfh',
+	рвИмя: /^7TV\b/i
+} ];
+
+// Resolves to the entries of ДОПОЛНЕНИЯ_ЧАТА whose extensions are installed and enabled.
+async function получитьУстановленныеДополненияЧата() {
+	const моРасширения = await chrome.runtime.sendMessage({
+		сЗапрос: 'ПолучитьВключенныеРасширения'
+	}) || [];
+	return ДОПОЛНЕНИЯ_ЧАТА.filter(оДополнение => моРасширения.some(оРасширение => оРасширение.id === оДополнение.сИд || оДополнение.рвИмя.test(оРасширение.name)));
+}
+
 const м_Журнал = (() => {
 	const МАКС_ДЛИНА_ЗАПИСИ = 1500;
 	let _мсЖурнал = null;
@@ -493,6 +520,9 @@ const м_Настройки = (() => {
 		чВысотаПанелиЧата: Настройка.СоздатьДиапазон(250, 100, МАКС_ЗНАЧЕНИЕ_НАСТРОЙКИ),
 		лПолноценныйЧат: Настройка.Создать(true),
 		лЗатемнитьЧат: Настройка.Создать(false),
+		лДополнениеЧатаFFZ: Настройка.Создать(false),
+		лДополнениеЧатаBTTV: Настройка.Создать(false),
+		лДополнениеЧата7TV: Настройка.Создать(false),
 		чРазмерИнтерфейса: Настройка.СоздатьДиапазон(этоМобильноеУстройство() ? 115 : 100, 50, 200),
 		чИнтервалАвтоскрытия: Настройка.СоздатьДиапазон(4, .5, 60),
 		лАнимацияИнтерфейса: Настройка.Создать(!этоМобильноеУстройство()),

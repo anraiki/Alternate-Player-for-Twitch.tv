@@ -20,7 +20,8 @@
     "cookies",
     "declarativeNetRequest",
     "declarativeNetRequestWithHostAccess",
-    "clipboardWrite"
+    "clipboardWrite",
+    "management"
   ],
   "host_permissions": [
     "*://*.twitch.tv/*",

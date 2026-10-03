@@ -846,6 +846,18 @@
 	{
 		"message": "Less features; dark mode"
 	},
+	"F0690":
+	{
+		"message": "Chat add-ons"
+	},
+	"A0691":
+	{
+		"message": "Load emote extensions into the player chat. Only extensions installed and enabled in your browser are listed. The browser does not run other extensions inside the player, so their scripts are downloaded from their official websites.\n\nAdd-on settings in the player chat are separate from the Twitch.tv website."
+	},
+	"F0692":
+	{
+		"message": "FrankerFaceZ, BetterTTV and 7TV extensions are not installed"
+	},
 	"F0653":
 	{
 		"message": "Copy channel address"
