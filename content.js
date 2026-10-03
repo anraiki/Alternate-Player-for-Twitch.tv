@@ -406,6 +406,7 @@ function изменитьСтильЧата() {
 
 function изменитьПоведениеЧата() {
 	добавитьОткрытиеЧатаВОкне();
+	показыватьУдаленныеСообщения();
 	window.addEventListener('click', оСобытие => {
 		if (!document.hasFocus()) {
 			const {activeElement} = document;
@@ -467,6 +468,59 @@ function добавитьОткрытиеЧатаВОкне() {
 		root.querySelectorAll(menuSelector).forEach(addLink);
 	}
 	// Settings are mounted lazily and recreated whenever the menu opens.
+	new MutationObserver(records => {
+		for (const record of records) {
+			for (const node of record.addedNodes) {
+				scan(node);
+			}
+		}
+	}).observe(document, {childList: true, subtree: true});
+	if (document.documentElement) {
+		scan(document.documentElement);
+	}
+}
+
+function показыватьУдаленныеСообщения() {
+	const lineSelector = '.chat-line__message';
+	const bodySelector = '[data-a-target="chat-line-message-body"]';
+	const noticeSelector = '[data-a-target="chat-deleted-message-placeholder"]';
+	// Twitch swaps the message body for a placeholder but keeps the line element,
+	// so remember the last body seen in every line.
+	const bodies = new WeakMap();
+	function remember(body) {
+		const line = body.closest(lineSelector);
+		if (line && !body.closest('.tw5-deleted-message')) {
+			bodies.set(line, body);
+		}
+	}
+	function restore(notice) {
+		if (notice.nextElementSibling?.classList.contains('tw5-deleted-message')) {
+			return;
+		}
+		const body = bodies.get(notice.closest(lineSelector));
+		if (!body || body.isConnected) {
+			return;
+		}
+		const restored = document.createElement('span');
+		restored.className = 'tw5-deleted-message';
+		restored.title = notice.textContent;
+		// Clone so the restored copy carries no React state of the unmounted original.
+		restored.appendChild(body.cloneNode(true));
+		notice.after(restored);
+	}
+	function scan(root) {
+		if (root.nodeType !== Node.ELEMENT_NODE) {
+			return;
+		}
+		if (root.matches(bodySelector)) {
+			remember(root);
+		} else if (root.matches(noticeSelector)) {
+			restore(root);
+		} else {
+			root.querySelectorAll(bodySelector).forEach(remember);
+			root.querySelectorAll(noticeSelector).forEach(restore);
+		}
+	}
 	new MutationObserver(records => {
 		for (const record of records) {
 			for (const node of record.addedNodes) {
