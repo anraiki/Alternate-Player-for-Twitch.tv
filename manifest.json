@@ -91,10 +91,10 @@
     },
     {
       "matches": [
-        "https://www.twitch.tv/popout/*/chat",
-        "https://www.twitch.tv/embed/*/chat",
-        "https://m.twitch.tv/popout/*/chat",
-        "https://m.twitch.tv/embed/*/chat"
+        "https://www.twitch.tv/popout/*/chat*",
+        "https://www.twitch.tv/embed/*/chat*",
+        "https://m.twitch.tv/popout/*/chat*",
+        "https://m.twitch.tv/embed/*/chat*"
       ],
       "js": [
         "mainworld-chat.js"
@@ -110,10 +110,10 @@
       ],
       "exclude_matches": [
         "https://www.twitch.tv/popout/",
-        "https://www.twitch.tv/popout/*/chat",
-        "https://www.twitch.tv/embed/*/chat",
-        "https://m.twitch.tv/popout/*/chat",
-        "https://m.twitch.tv/embed/*/chat"
+        "https://www.twitch.tv/popout/*/chat*",
+        "https://www.twitch.tv/embed/*/chat*",
+        "https://m.twitch.tv/popout/*/chat*",
+        "https://m.twitch.tv/embed/*/chat*"
       ],
       "js": [
         "mainworld-functions.js"
